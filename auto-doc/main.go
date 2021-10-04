@@ -67,8 +67,6 @@ func main() {
 		output += str + "\n"
 	}
 
-	output += "## Additional Reference Information\n"
-
 	ref, err := os.ReadFile(filepath.Join(buildpackDir, "reference-doc.md"))
 	if err != nil {
 		log.Fatal(err)
