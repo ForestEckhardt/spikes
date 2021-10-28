@@ -69,27 +69,53 @@ This environment variable is used during build
 the JVM launch flags
 This environment variable is used during launch
 
-## Build Plan
-```
-[[provides]]
-name = "lorem"
+## Behavior
 
-[[requires]]
-name = "ipsum"
+This buildpack will participate if any of the following conditions are met
 
-[requires.metadata]
-build = true
-```
+* Another buildpack requires `jdk`
+* Another buildpack requires `jre`
 
-## Caching Reuse Logic
-| `lorem` | `ipsum` | `dolor` | Command |
-| ------- | ------- | ------- | ------- |
-| X | X | X | `sum` |
-| X | X | ✓ | `sum` |
-| X | ✓ | X | `es` |
-| X | ✓ | ✓ | `es` |
-| ✓ | X | X | `est` |
-| ✓ | X | ✓ | `est` |
-| ✓ | ✓ | X | `es` |
-| ✓ | ✓ | ✓ | `est` |
+The buildpack will do the following if a JDK is requested:
+
+* Contributes a JDK to a layer marked `build` and `cache` with all commands on `$PATH`
+* Contributes `$JAVA_HOME` configured to the build layer
+* Contributes `$JDK_HOME` configure to the build layer
+
+The buildpack will do the following if a JRE is requested:
+
+* Contributes a JRE to a layer with all commands on `$PATH`
+* Contributes `$JAVA_HOME` configured to the layer
+* Contributes `-XX:ActiveProcessorCount` to the layer
+* Contributes `-XX:+ExitOnOutOfMemoryError` to the layer
+* Contributes `-XX:+UnlockDiagnosticVMOptions`,`-XX:NativeMemoryTracking=summary` & `-XX:+PrintNMTStatistics` to the layer (Java NMT)
+* If `BPL_JMX_ENABLED = true`
+  * Contributes `-Djava.rmi.server.hostname=127.0.0.1`, `-Dcom.sun.management.jmxremote.authenticate=false`, `-Dcom.sun.management.jmxremote.ssl=false` & `-Dcom.sun.management.jmxremote.rmi.port=5000`
+* If `BPL_DEBUG_ENABLED = true`
+  * Contributes `-agentlib:jdwp=transport=dt_socket,server=y,address=*:8000,suspend=n`. If Java version is 8, address parameter is `address=:8000`
+* Contributes `$MALLOC_ARENA_MAX` to the layer
+* Disables JVM DNS caching if link-local DNS is available
+* If `metadata.build = true`
+  * Marks layer as `build` and `cache`
+* If `metadata.launch = true`
+  * Marks layer as `launch`
+* Contributes Memory Calculator to a layer marked `launch`
+* Contributes Heap Dump helper to a layer marked `launch`
+
+## Bindings
+
+The buildpack optionally accepts the following bindings:
+
+### Type: `dependency-mapping`
+
+| Key                   | Value   | Description                                                                                       |
+| --------------------- | ------- | ------------------------------------------------------------------------------------------------- |
+| `<dependency-digest>` | `<uri>` | If needed, the buildpack will fetch the dependency with digest `<dependency-digest>` from `<uri>` |
+
+## License
+
+This buildpack is released under version 2.0 of the [Apache License][a].
+
+[a]: http://www.apache.org/licenses/LICENSE-2.0
+
 

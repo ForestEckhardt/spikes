@@ -6,8 +6,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/pelletier/go-toml"
+	"gopkg.in/yaml.v2"
 )
 
 type BuildpackTOML struct {
@@ -67,12 +69,57 @@ func main() {
 		output += str + "\n"
 	}
 
-	ref, err := os.ReadFile(filepath.Join(buildpackDir, "reference-doc.md"))
+	c, err := os.ReadFile(filepath.Join(buildpackDir, "README.md"))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	output += string(ref)
+	content := string(c)
+
+	re := regexp.MustCompile(`\n+## (.+)\n+`)
+
+	headings := re.FindAllStringSubmatch(content, -1)
+
+	yamlFile, err := os.Open(filepath.Join(buildpackDir, ".docs.yml"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer yamlFile.Close()
+
+	var docsYAML struct {
+		Exclude []string `yaml:"exclude"`
+	}
+
+	err = yaml.NewDecoder(yamlFile).Decode(&docsYAML)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for i, h := range headings {
+		shouldExclude := func() bool {
+			for _, e := range docsYAML.Exclude {
+				if h[1] == e {
+					return true
+				}
+			}
+			return false
+		}
+
+		if shouldExclude() {
+			continue
+		}
+
+		var tre *regexp.Regexp
+		if i < len(headings)-1 {
+			tre = regexp.MustCompile(fmt.Sprintf(`\n+(## %s\n+[\s\S]*\n+)## %s\n+`, h[1], headings[i+1][1]))
+		} else {
+			tre = regexp.MustCompile(fmt.Sprintf(`\n+(## %s\n+[\s\S]*)$`, h[1]))
+		}
+		temp := tre.FindAllStringSubmatch(string(content), -1)
+		if len(temp) > 0 {
+			output += temp[0][1]
+		}
+	}
 
 	fmt.Println(output)
 }
